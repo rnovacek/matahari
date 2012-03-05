@@ -59,6 +59,7 @@ BuildRequires:  nss-devel
 BuildRequires:  help2man
 BuildRequires:  augeas-devel >= 0.9.0
 BuildRequires:  python2-devel
+BuildRequires:  python-cheetah
 
 %if %{with qmf}
 BuildRequires:  qpid-cpp-client-devel > 0.7
@@ -733,6 +734,8 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 
 %{_libdir}/libm*.so
 %{_includedir}/matahari.h
+%{_includedir}/matahari/matahari.h
+%{_includedir}/matahari/matahari-private.h
 %{_includedir}/matahari/config.h
 %{_includedir}/matahari/logging.h
 %{_includedir}/matahari/utilities.h
@@ -742,15 +745,21 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{_includedir}/matahari/network.h
 %{_includedir}/matahari/rpc.h
 %{_includedir}/matahari/sysconfig.h
+%{_includedir}/matahari/sysconfig_common.h
 %{_includedir}/matahari/services.h
+%{_includedir}/matahari/services_common.h
 %{_datadir}/cmake/Modules/FindMatahari.cmake
 %{_datadir}/cmake/Modules/MatahariMacros.cmake
+%{_datadir}/matahari/schema-to-header.tmpl
+%{_datadir}/matahari/generate.py*
+%{_datadir}/matahari/types.xml
 
 %if %{with qmf}
 %{_includedir}/matahari/agent.h
 %{_includedir}/matahari/object.h
 %{_includedir}/matahari/mainloop.h
 %{_datadir}/cmake/Modules/FindQPID.cmake
+%{_datadir}/matahari/schema-to-qmf-glue.tmpl
 %endif
 
 %if %{with dbus}
@@ -759,6 +768,7 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{_datadir}/matahari/schema-to-dbus.xsl
 %{_datadir}/matahari/dbus-to-c.xsl
 %{_datadir}/matahari/check-policy.xsl
+%{_datadir}/matahari/schema-to-dbus-glue.tmpl
 %endif
 
 %changelog

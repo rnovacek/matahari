@@ -39,9 +39,9 @@
 #include <curl/curl.h>
 
 #include "matahari/logging.h"
-#include "matahari/host.h"
+#include <sigar.h>
 
-#include "utilities_private.h"
+#include "lib/utilities_private.h"
 #include "host_private.h"
 
 

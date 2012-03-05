@@ -20,15 +20,6 @@ macro(generate_dbus_headers API XML)
         COMMENT "Generating ${API}-dbus-glue.h"
         VERBATIM
     )
-
-    add_custom_command(
-        OUTPUT ${API}-dbus-properties.h
-        COMMAND ${XSLTPROC} --output ${API}-dbus-properties.h
-            ${DBUS_TO_C}
-            ${XML}
-        COMMENT "Generating ${API}-dbus-properties.h"
-        VERBATIM
-    )
 endmacro(generate_dbus_headers)
 
 # This macro will transform QMF interface XML to DBus interface XML file
@@ -152,3 +143,56 @@ macro(create_service_scripts BASE)
                 RENAME matahari-${BASE}.conf)
     endif(IS_DIRECTORY /lib/init)
 endmacro(create_service_scripts)
+
+# This macro takes QMF schema and create header file that contains
+# definitions of all functions that needs to be implemented in the library
+macro(generate_headers_from_schema SCHEMA OUT_FILE)
+    find_file(SCHEMA_TO_HEADER_TEMPLATE schema-to-header.tmpl
+              ${CMAKE_CURRENT_SOURCE_DIR}/..
+              /usr/share/matahari
+              NO_DEFAULT_PATH
+              NO_CMAKE_FIND_ROOT_PATH)
+
+    generate_glue(${SCHEMA} ${OUT_FILE} ${SCHEMA_TO_HEADER_TEMPLATE})
+endmacro(generate_headers_from_schema)
+
+# Create QMF glue from QMF schema
+macro(generate_qmf_glue SCHEMA OUT_FILE)
+    find_file(SCHEMA_TO_QMF_GLUE_TEMPLATE schema-to-qmf-glue.tmpl
+              ${CMAKE_CURRENT_SOURCE_DIR}/..
+              /usr/share/matahari
+              NO_DEFAULT_PATH
+              NO_CMAKE_FIND_ROOT_PATH)
+
+    generate_glue(${SCHEMA} ${OUT_FILE} ${SCHEMA_TO_QMF_GLUE_TEMPLATE})
+endmacro(generate_qmf_glue)
+
+# Create DBus glue from QMF schema
+macro(generate_dbus_glue SCHEMA OUT_FILE)
+    find_file(SCHEMA_TO_DBUS_GLUE_TEMPLATE schema-to-dbus-glue.tmpl
+              ${CMAKE_CURRENT_SOURCE_DIR}/..
+              /usr/share/matahari
+              NO_DEFAULT_PATH
+              NO_CMAKE_FIND_ROOT_PATH)
+
+    generate_glue(${SCHEMA} ${OUT_FILE} ${SCHEMA_TO_DBUS_GLUE_TEMPLATE})
+endmacro(generate_dbus_glue)
+
+# Use given TEMPLATE and SCHEMA to produce OUT_FILE
+macro(generate_glue SCHEMA OUT_FILE TEMPLATE)
+    find_file(GENERATE generate.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/..
+              /usr/share/matahari
+              NO_DEFAULT_PATH
+              NO_CMAKE_FIND_ROOT_PATH)
+
+    add_custom_command(
+        OUTPUT ${OUT_FILE}
+        COMMAND ${PYTHON_EXECUTABLE} ${GENERATE} ${TEMPLATE} ${SCHEMA} > ${CMAKE_CURRENT_BINARY_DIR}/${OUT_FILE}
+        DEPENDS ${TEMPLATE} ${SCHEMA}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating ${OUT_FILE}"
+        VERBATIM
+    )
+
+endmacro(generate_glue)

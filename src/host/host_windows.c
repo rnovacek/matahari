@@ -32,8 +32,7 @@
 #include <pcre.h>
 
 #include "matahari/logging.h"
-#include "matahari/host.h"
-#include "matahari/errors.h"
+#include "matahari/matahari.h"
 #include "host_private.h"
 
 static const char CUSTOM_UUID_KEY[] = "CustomUUID";

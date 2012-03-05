@@ -30,7 +30,9 @@
 #include "matahari/logging.h"
 #include "matahari/utilities.h"
 #include "matahari/errors.h"
+#include "matahari/matahari.h"
 #include "utilities_private.h"
+#include "matahari/matahari-private.h"
 
 MH_TRACE_INIT_DATA(mh_core);
 int mh_log_level = LOG_NOTICE;
@@ -542,8 +544,63 @@ mh_result_to_str(enum mh_result res)
         return "You are not authorized for specified action";
     case MH_RES_OTHER_ERROR:
         return "General error";
+    case MH_RES_ASYNC:
+        return "FIXME: method is asynchronous, this should not happen";
     }
     return "FIXME: result code doesn't have message assigned!";
+}
+
+Matahari *
+matahari_new()
+{
+    Matahari *matahari = malloc(sizeof(Matahari));
+    matahari->error = NULL;
+    matahari->priv = NULL;
+    matahari->update_properties_func = NULL;
+    matahari->emit_event_func = NULL;
+    matahari->data = NULL;
+    return matahari;
+}
+
+void *
+matahari_get_priv(Matahari *matahari)
+{
+    return matahari->priv;
+}
+
+void
+matahari_set_priv(Matahari *matahari, void *priv)
+{
+    matahari->priv = priv;
+}
+
+void
+matahari_set_error(Matahari* matahari, GError *error)
+{
+    matahari->error = error;
+}
+
+void
+matahari_emit_event(Matahari *matahari, const char *name, ...)
+{
+    if (matahari->emit_event_func) {
+        va_list v;
+        matahari->emit_event_func(matahari, name, v);
+    }
+}
+
+void
+matahari_update_properties(Matahari *matahari)
+{
+    if (matahari->update_properties_func) {
+        matahari->update_properties_func(matahari);
+    }
+}
+
+mh_callback
+matahari_get_callback(Matahari *matahari)
+{
+    return matahari->callback;
 }
 
 gssize
@@ -568,3 +625,8 @@ mh_read_from_fd(int fd, char **data)
     return length;
 }
 
+GQuark
+matahari_error_quark (void)
+{
+    return g_quark_from_static_string ("matahari-error-quark");
+}

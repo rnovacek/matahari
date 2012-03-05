@@ -29,9 +29,10 @@
 
 #include "matahari/logging.h"
 #include "matahari/utilities.h"
-#include "matahari/sysconfig.h"
 #include "matahari/sysconfig_internal.h"
 #include "sysconfig_private.h"
+
+#include "sysconfig.h"
 
 MH_TRACE_INIT_DATA(mh_sysconfig);
 
@@ -40,6 +41,21 @@ static const char DEFAULT_KEYS_DIR[] = "c:\\";
 #else
 static const char DEFAULT_KEYS_DIR[] = "/var/lib/matahari/sysconfig-keys/";
 #endif
+
+#define priv(mh) ((SysconfigPriv *) matahari_get_priv(mh))
+
+typedef struct _SysconfigPriv {
+    unsigned int is_postboot_configured;
+} SysconfigPriv;
+
+void
+mh_sysconfig_init(Matahari *matahari)
+{
+    SysconfigPriv *priv = malloc(sizeof(SysconfigPriv));
+    priv->is_postboot_configured = 0;
+
+    matahari_set_priv(matahari, priv);
+}
 
 /*!
  * Directory to store sysconfig action keys
@@ -121,8 +137,8 @@ set_key(const char *key, const char *contents)
     return MH_RES_SUCCESS;
 }
 
-static char *
-get_key(const char *key)
+char *
+mh_sysconfig_get_key(const char *key)
 {
     char key_file[PATH_MAX];
     char *contents = NULL;
@@ -148,37 +164,79 @@ mh_sysconfig_set_configured(const char *key, const char *contents)
     return set_key(key, contents);
 }
 
-char *
-mh_sysconfig_is_configured(const char *key)
+enum mh_result
+mh_sysconfig_is_configured(Matahari *matahari, const char *key, char **status)
 {
-    return get_key(key);
+    *status = mh_sysconfig_get_key(key);
+    if (*status == NULL) {
+        *status = strdup("unknown");
+    }
+    return MH_RES_SUCCESS;
 }
 
 enum mh_result
-mh_sysconfig_run_uri(const char *uri, uint32_t flags, const char *scheme, const char *key,
-                     mh_sysconfig_result_cb result_cb, void *cb_data)
+mh_sysconfig_run_uri(Matahari *matahari, const char *uri, unsigned int flags,
+                     const char *scheme, const char *key, char **status)
 {
     if (check_key_sanity(key)) {
         return MH_RES_INVALID_ARGS;
     }
 
-    return sysconfig_os_run_uri(uri, flags, scheme, key, result_cb, cb_data);
+    return sysconfig_os_run_uri(uri, flags, scheme, key,
+                                matahari_get_callback(matahari), matahari);
 }
 
 enum mh_result
-mh_sysconfig_run_string(const char *string, uint32_t flags, const char *scheme,
-                        const char *key, mh_sysconfig_result_cb result_cb,
-                        void *cb_data)
+mh_sysconfig_run_string(Matahari *matahari, const char *string, uint32_t flags,
+                        const char *scheme, const char *key, char **status)
 {
     if (check_key_sanity(key)) {
         return MH_RES_INVALID_ARGS;
     }
 
-    return sysconfig_os_run_string(string, flags, scheme, key, result_cb, cb_data);
+    return sysconfig_os_run_string(string, flags, scheme, key,
+                                   matahari_get_callback(matahari), matahari);
+}
+
+enum mh_result
+mh_sysconfig_query(Matahari *matahari, const char *text, unsigned int flags,
+                   const char *scheme, char **data)
+{
+    *data = sysconfig_os_query(text, flags, scheme);
+    if (*data == NULL) {
+        *data = strdup("unknown");
+    }
+
+    return MH_RES_SUCCESS;
 }
 
 char *
-mh_sysconfig_query(const char *query, uint32_t flags, const char *scheme)
+mh_sysconfig_prop_get_uuid(Matahari *matahari)
 {
-    return sysconfig_os_query(query, flags, scheme);
+    return strdup(mh_uuid());
+}
+
+char *
+mh_sysconfig_prop_get_hostname(Matahari *matahari)
+{
+    return strdup(mh_hostname());
+}
+
+int64_t
+mh_sysconfig_prop_get_qmf_gen_no_crash(Matahari *matahari)
+{
+    return 0;
+}
+
+unsigned int
+mh_sysconfig_prop_get_is_postboot_configured(Matahari *matahari)
+{
+    return priv(matahari)->is_postboot_configured;
+}
+
+void
+mh_sysconfig_prop_set_is_postboot_configured(Matahari *matahari,
+                                             unsigned int is_postboot_configured)
+{
+    priv(matahari)->is_postboot_configured = is_postboot_configured;
 }

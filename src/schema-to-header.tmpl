@@ -1,0 +1,63 @@
+#set $AgentClass = $schema.find("class").get("name")
+#set $base = $AgentClass.lower()
+#set $hasStatistics = len($schema.xpath("/schema/class/statistic")) > 0
+#set $classes = $schema.findall("class")
+
+\#include "matahari/errors.h"
+\#include <stdint.h>
+
+typedef struct Matahari Matahari;
+typedef struct _GList GList;
+typedef struct _GHashTable GHashTable;
+
+void
+mh_${base}_init(Matahari *);
+
+#for $cls in $classes
+    #set $clsname = $cls.get('name').lower()
+
+    #for prop in $cls.xpath("property|statistic")
+        #set $name = $prop.get('name').lower().replace('-', '_')
+        #set $type = $getType(prop.get('type'))
+        ## Documentation
+/**
+ * ${prop.get('desc')}
+ */
+        ## Getter
+${type.get('ctype')}
+mh_${clsname}_prop_get_${name}(Matahari *matahari);
+        ## Setter
+        #if $prop.get('access') == "RW"
+void
+mh_${clsname}_prop_set_${name}(Matahari *matahari, ${type.get('ctype')}${name});
+        #end if
+
+    #end for
+
+    #for method in $cls.findall('method')
+        ## Documentation
+/**
+ * ${method.get('desc')}
+        #set args = ""
+        #for arg in $method.findall('arg')
+            #set $name = $arg.get('name').lower().replace('-', '_')
+            #set $type = $getType($arg.get('type'))
+            #set $dir = {'I': 'in', 'O': 'out', 'IO': 'in,out'}[$arg.get('dir')]
+            #if $arg.get('dir') != 'I'
+                #set $args += ", %s*%s" % ($type.get('ctype'), $name)
+            #else
+                #if $arg.get('type') in ['sstr', 'lstr']
+                    #set $args += ", const %s%s" % ($type.get('ctype'), $name)
+                #else
+                    #set $args += ", %s%s" % ($type.get('ctype'), $name)
+                #end if
+            #end if
+ * \param[${dir}] ${name} ${arg.get('desc')}
+        #end for
+ */
+        ## Declaration
+enum mh_result
+mh_${clsname}_${method.get('name')}(Matahari *matahari${args});
+
+    #end for
+#end for

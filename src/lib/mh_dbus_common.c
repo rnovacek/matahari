@@ -34,16 +34,9 @@
 #include <dbus/dbus-glib-bindings.h>
 
 /* Generate the GObject boilerplate */
-G_DEFINE_TYPE(Matahari, matahari, G_TYPE_OBJECT)
+G_DEFINE_TYPE(GMatahari, gmatahari, G_TYPE_OBJECT)
 
 const DBusGObjectInfo dbus_glib_matahari_object_info;
-
-GQuark
-matahari_error_quark (void)
-{
-    return g_quark_from_static_string ("matahari-error-quark");
-}
-
 
 gboolean
 check_authorization(const gchar *action, GError** error,
@@ -100,71 +93,51 @@ check_authorization(const gchar *action, GError** error,
     return res;
 }
 
-gboolean
-get_paramspec_from_property(Property prop, GParamSpec** pspec)
+GParamSpec *
+get_paramspec(const char *name, const char *desc, char *type, GParamFlags flags)
 {
-    GType value_type;
-    switch (prop.type) {
-    case 's':
-        *pspec = g_param_spec_string(prop.name, prop.nick, prop.desc,
-                                     NULL, prop.flags);
-        break;
-    case 'b':
-        *pspec = g_param_spec_boolean(prop.name, prop.nick, prop.desc,
-                                      FALSE, prop.flags);
-        break;
-    case 'n':
-    case 'i':
-        *pspec = g_param_spec_int(prop.name, prop.nick, prop.desc,
-                                  G_MININT, G_MAXINT, 0, prop.flags);
-        break;
-    case 'x':
-        *pspec = g_param_spec_int64(prop.name, prop.nick, prop.desc,
-                                    G_MININT64, G_MAXINT64, 0, prop.flags);
-
-        break;
-    case 'y':
-    case 'q':
-    case 'u':
-        *pspec = g_param_spec_uint(prop.name, prop.nick, prop.desc,
-                                   0, G_MAXUINT, 0, prop.flags);
-        break;
-    case 't':
-        *pspec = g_param_spec_uint64(prop.name, prop.nick, prop.desc,
-                                     0, G_MAXUINT64, 0, prop.flags);
-        break;
-    case 'd':
-        *pspec = g_param_spec_double(prop.name, prop.nick, prop.desc,
-                                     -G_MAXDOUBLE, G_MAXDOUBLE, 0,
-                                     prop.flags);
-        break;
-    case 'e':
-        // Type is map - key is string, type of value must be added manually!
-        value_type = matahari_dict_type(prop.prop);
-        *pspec = g_param_spec_boxed(prop.name, prop.nick, prop.desc,
-                                    dbus_g_type_get_map("GHashTable",
-                                                        G_TYPE_STRING,
-                                                        value_type),
-                                    prop.flags);
-        break;
-    default:
-        return FALSE;
+    if (strcmp(type, "lstr") == 0 || strcmp(type, "sstr") == 0) {
+        return g_param_spec_string(name, name, desc, NULL, flags);
+    } else if (strcmp(type, "int64") == 0 || strcmp(type, "absTime") == 0) {
+        return g_param_spec_int64(name, name, desc, G_MININT64, G_MAXINT64, 0, flags);
+    } else if (strncmp(type, "int", 3) == 0) {
+        return g_param_spec_int(name, name, desc, G_MININT, G_MAXINT, 0, flags);
+    } else if (strcmp(type, "uint64") == 0 || strcmp(type, "deltaTime") == 0) {
+        return g_param_spec_uint64(name, name, desc, 0, G_MAXUINT64, 0, flags);
+    } else if (strncmp(type, "uint", 4) == 0) {
+        return g_param_spec_uint(name, name, desc, 0, G_MAXUINT, 0, flags);
+    } else if (strcmp(type, "bool") == 0) {
+        return g_param_spec_boolean(name, name, desc, FALSE, flags);
+    } else if (strcmp(type, "float") == 0) {
+        return g_param_spec_float(name, name, desc, -G_MAXFLOAT, G_MAXFLOAT, 0, flags);
+    } else if (strcmp(type, "double") == 0) {
+        return g_param_spec_double(name, name, desc, -G_MAXDOUBLE, G_MAXDOUBLE, 0, flags);
+    } else if (strcmp(type, "map") == 0) {
+        // TODO: fix it
+        return g_param_spec_boxed(name, name, desc,
+                                  dbus_g_type_get_map("GHashTable",
+                                                      G_TYPE_STRING,
+                                                      G_TYPE_STRING), flags);
+    } else if (strcmp(type, "list") == 0) {
+        return g_param_spec_value_array(name, name, desc, g_param_spec_string("", "", "", NULL, flags), flags);
+    } else {
+        mh_err("Unknown type of property: %s", type);
     }
-    return TRUE;
-
+    return NULL;
 }
 
 int
-run_dbus_server(char *bus_name, char *object_path)
+run_dbus_server(GObject *obj, char *bus_name, char *object_path)
 {
     GMainLoop* loop = NULL;
     DBusGConnection *connection = NULL;
     GError *error = NULL;
-    GObject *obj = NULL;
     DBusGProxy *driver_proxy = NULL;
     guint32 request_name_ret;
 
-    mh_log_init(bus_name, LOG_DEBUG, FALSE);
+    // TODO: argument handling
+
+    mh_log_init(bus_name, LOG_DEBUG, TRUE); // TODO: FALSE
 
     loop = g_main_loop_new(NULL, FALSE);
 
@@ -176,7 +149,6 @@ run_dbus_server(char *bus_name, char *object_path)
         return 1;
     }
 
-    obj = g_object_new(MATAHARI_TYPE, NULL);
     dbus_g_connection_register_g_object(connection, object_path, obj);
 
     driver_proxy = dbus_g_proxy_new_for_name(connection, DBUS_SERVICE_DBUS,
@@ -212,13 +184,12 @@ run_dbus_server(char *bus_name, char *object_path)
     mainloop_track_children(G_PRIORITY_DEFAULT);
     g_main_loop_run(loop);
     g_main_loop_unref(loop);
-    g_object_unref(obj);
     g_object_unref(driver_proxy);
     return 0;
 }
 
 gboolean
-matahari_get(Matahari* matahari, const char *interface, const char *name,
+matahari_get(GMatahari* matahari, const char *interface, const char *name,
              DBusGMethodInvocation *context)
 {
     GError* error = NULL;
@@ -249,7 +220,7 @@ matahari_get(Matahari* matahari, const char *interface, const char *name,
 }
 
 gboolean
-matahari_set(Matahari *matahari, const char *interface, const char *name,
+matahari_set(GMatahari *matahari, const char *interface, const char *name,
              GValue *value, DBusGMethodInvocation *context)
 {
     GError* error = NULL;
@@ -270,62 +241,33 @@ matahari_set(Matahari *matahari, const char *interface, const char *name,
 
 /* Class init */
 static void
-matahari_class_init(MatahariClass *matahari_class)
+gmatahari_class_init(GMatahariClass *matahari_class)
 {
     GObjectClass *gobject_class = G_OBJECT_CLASS(matahari_class);
-    GParamSpec *pspec = NULL;
 
     gobject_class->set_property = matahari_set_property;
     gobject_class->get_property = matahari_get_property;
 
-    int i;
-    for (i = 0; properties[i].name != NULL; i++) {
-        if (!get_paramspec_from_property(properties[i], &pspec)) {
-            g_printerr("Unknown type: %c\n", properties[i].type);
-            pspec = NULL;
-        }
-        if (pspec)
-            g_object_class_install_property(gobject_class, properties[i].prop,
-                                            pspec);
-    }
+    gmatahari_init_properties(gobject_class);
 
-    dbus_g_object_type_install_info(MATAHARI_TYPE,
+    dbus_g_object_type_install_info(GMATAHARI_TYPE,
                                     &dbus_glib_matahari_object_info);
 }
 
 /* Instance init */
 static void
-matahari_init(Matahari *matahari)
+gmatahari_init(GMatahari *gmatahari)
 {
-    matahari->priv = MATAHARI_GET_PRIVATE(matahari);
-}
-
-Dict *
-dict_new(GValue *value)
-{
-    gpointer ret;
-    Dict *dict = malloc(sizeof(Dict));
-    dict->key = calloc(sizeof(GValue), 1);
-    dict->value = value;
-    g_value_init(dict->key, G_TYPE_STRING);
-    ret = dbus_g_type_specialized_construct (G_VALUE_TYPE (value));
-    g_value_set_boxed_take_ownership (value, ret);
-
-    dbus_g_type_specialized_init_append (value, &(dict->appendctx));
-
-    return dict;
 }
 
 void
-dict_add(Dict *dict, const gchar *key, GValue *value)
+glist_to_dbus_message_iter(GList *list, DBusMessageIter *iter)
 {
-    g_value_set_static_string(dict->key, key);
-    dbus_g_type_specialized_map_append (&(dict->appendctx), dict->key, value);
-}
-
-void
-dict_free(Dict *dict)
-{
-    free(dict->key);
-    free(dict);
+    GList *plist;
+    DBusMessageIter subiter;
+    dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING_AS_STRING, &subiter);
+    for (plist = g_list_first(list); plist; plist = g_list_next(plist)) {
+        dbus_message_iter_append_basic(&subiter, DBUS_TYPE_STRING, &plist->data);
+    }
+    dbus_message_iter_close_container(iter, &subiter);
 }

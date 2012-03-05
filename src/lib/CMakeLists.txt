@@ -1,9 +1,5 @@
 # Library
 
-set(LIBS mcommon mhost mnetwork mservice msysconfig)
-if(NOT WIN32)
-    set(LIBS ${LIBS} mrpc)
-endif(NOT WIN32)
 include_directories(${pcre_INCLUDE_DIRS})
 
 # See http://sourceware.org/autobook/autobook/autobook_91.html for
@@ -17,39 +13,19 @@ if(HAVE_RESOLV_H)
     target_link_libraries(mcommon resolv)
 endif(HAVE_RESOLV_H)
 
-add_library (mhost SHARED host.c host_${VARIANT}.c)
-set_target_properties(mhost PROPERTIES SOVERSION 1.0.0)
-target_link_libraries(mhost ${uuid_LIBRARIES} ${pcre_LIBRARIES} mcommon ${SIGAR} ${glib_LIBRARIES})
-
-add_library (mnetwork SHARED network.c  network_${VARIANT}.c)
-set_target_properties(mnetwork PROPERTIES SOVERSION 1.0.0)
-target_link_libraries(mnetwork ${pcre_LIBRARIES} mcommon ${SIGAR} ${glib_LIBRARIES})
-
 if(NOT WIN32)
 add_library (mrpc SHARED rpc.c rpc-python.c)
 set_target_properties(mrpc PROPERTIES SOVERSION 1.0.0)
 target_link_libraries(mrpc mcommon ${python_LIBRARIES})
+install(TARGETS mrpc DESTINATION lib${LIB_SUFFIX})
 endif(NOT WIN32)
 
-add_library (mservice SHARED services.c services_${VARIANT}.c)
-set_target_properties(mservice PROPERTIES SOVERSION 1.0.0)
-target_link_libraries(mservice ${pcre_LIBRARIES} mcommon ${SIGAR} ${glib_LIBRARIES})
-
-add_library (msysconfig SHARED sysconfig.c sysconfig_${VARIANT}.c)
-set_target_properties(msysconfig PROPERTIES SOVERSION 1.0.0)
-target_link_libraries(msysconfig ${pcre_LIBRARIES} mcommon mservice ${glib_LIBRARIES} ${augeas_LIBRARIES})
-include_directories(${augeas_INCLUDE_DIRS})
-
 if(WIN32)
-    foreach (lib ${LIBS})
-        target_link_libraries(${lib} wsock32 dnsapi rpcrt4 wininet)
-        install(TARGETS ${lib} DESTINATION sbin)
-    endforeach (lib ${LIBS})
+    target_link_libraries(mcommon wsock32 dnsapi rpcrt4 wininet)
+    install(TARGETS mcommon DESTINATION sbin)
 else(WIN32)
-    foreach (lib ${LIBS})
-        target_link_libraries(${lib} curl)
-        install(TARGETS ${lib} DESTINATION lib${LIB_SUFFIX})
-    endforeach (lib ${LIBS})
+    target_link_libraries(mcommon curl)
+    install(TARGETS mcommon DESTINATION lib${LIB_SUFFIX})
 endif(WIN32)
 
 if(WITH-QMF)

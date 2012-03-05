@@ -23,32 +23,34 @@
 #ifndef MHGOBJECTCLASS_H_
 #define MHGOBJECTCLASS_H_
 
-#define MATAHARI_TYPE            (matahari_get_type())
-#define MATAHARI(object)         (G_TYPE_CHECK_INSTANCE_CAST ((object), \
-                                  MATAHARI_TYPE, Matahari))
-#define MATAHARI_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), \
-                                  MATAHARI_TYPE, MatahariClass))
-#define IS_MATAHARI(object)      (G_TYPE_CHECK_INSTANCE_TYPE ((object), \
-                                  MATAHARI_TYPE))
-#define IS_MATAHARI_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), \
-                                  MATAHARI_TYPE))
-#define MATAHARI_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), \
-                                  MATAHARI_TYPE, MatahariClass))
+#include "matahari/matahari.h"
 
-typedef struct _Matahari Matahari;
-typedef struct _MatahariClass MatahariClass;
-typedef struct _MatahariPrivate MatahariPrivate;
+#define GMATAHARI_TYPE            (gmatahari_get_type())
+#define GMATAHARI(object)         (G_TYPE_CHECK_INSTANCE_CAST ((object), \
+                                  GMATAHARI_TYPE, GMatahari))
+#define GMATAHARI_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), \
+                                  GMATAHARI_TYPE, GMatahariClass))
+#define IS_GMATAHARI(object)      (G_TYPE_CHECK_INSTANCE_TYPE ((object), \
+                                  GMATAHARI_TYPE))
+#define IS_GMATAHARI_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), \
+                                  GMATAHARI_TYPE))
+#define GMATAHARI_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), \
+                                  GMATAHARI_TYPE, GMatahariClass))
+
+typedef struct _GMatahari GMatahari;
+typedef struct _GMatahariClass GMatahariClass;
+typedef struct _GMatahariPrivate GMatahariPrivate;
 
 GType
-matahari_get_type(void);
+gmatahari_get_type(void);
 
-struct _Matahari
+struct _GMatahari
 {
     GObject parent;
-    MatahariPrivate *priv;
+    Matahari *matahari;
 };
 
-struct _MatahariClass
+struct _GMatahariClass
 {
     GObjectClass parent;
 };

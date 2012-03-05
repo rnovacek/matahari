@@ -30,6 +30,8 @@
 extern "C" {
 #endif
 
+#include <glib.h>
+
 /**
  * Global enumeration with result codes.
  */
@@ -40,7 +42,8 @@ enum mh_result {
     MH_RES_DOWNLOAD_ERROR,
     MH_RES_BACKEND_ERROR,
     MH_RES_AUTHENTICATION_ERROR,
-    MH_RES_OTHER_ERROR
+    MH_RES_OTHER_ERROR,
+    MH_RES_ASYNC
 };
 
 /**
@@ -52,6 +55,20 @@ enum mh_result {
  */
 const char *
 mh_result_to_str(enum mh_result res);
+
+/**
+ * Matahari error
+ */
+
+// Matahari error codes
+#define MATAHARI_ERROR (matahari_error_quark())
+
+GQuark
+matahari_error_quark(void);
+
+typedef GError MatahariError;
+
+#define mh_error_new(code, fmt, args...) g_error_new(MATAHARI_ERROR, code, fmt, args)
 
 #ifdef __cplusplus
 }

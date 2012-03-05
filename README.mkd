@@ -30,6 +30,7 @@ Matahari has build dependencies on the following packages:
 18. augeas-devel
 19. cmake
 20. nss-devel
+21. python-cheetah
 
 Matahari requires that the following packages are installed at runtime
 for certain pieces of functionality to work:

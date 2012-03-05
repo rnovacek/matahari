@@ -1,0 +1,261 @@
+
+#set $AgentClass = $schema.find("class").get("name")
+#set $base = $AgentClass.lower()
+#set $hasStatistics = len($schema.xpath("class/statistic")) > 0
+#set $classes = $schema.findall("class")
+
+\#include "matahari/dbus_common.h"
+\#include "matahari/errors.h"
+\#include "matahari/matahari-private.h"
+\#include <dbus/dbus-glib-lowlevel.h>
+\#include <stdlib.h>
+\#include "${base}.h"
+
+struct Matahari;
+
+/* DBus names */
+\#define BUS_NAME "org.matahariproject.$AgentClass"
+\#define OBJECT_PATH "/org/matahariproject/$AgentClass"
+\#define DBUS_PROPERTY_INTERAFACE_NAME "org.freedesktop.DBus.Properties"
+
+#for cls in $classes
+\#define ${cls.get('name').upper()}_INTERFACE_NAME "org.matahariproject.${cls.get('name')}"
+#end for
+
+/**
+ * Create the clone of Matahari struct to be used in library method call.
+ * The clone will be freed in the callback.
+ */
+Matahari *
+matahari_clone(Matahari *matahari, DBusGMethodInvocation *context, mh_callback callback)
+{
+    Matahari *mh = matahari_new();
+    mh->priv = matahari->priv;
+    mh->update_properties_func = matahari->update_properties_func;
+    mh->emit_event_func = matahari->emit_event_func;
+    mh->data = context;
+    mh->callback = callback;
+    return mh;
+}
+
+gboolean
+process_error(enum mh_result res, Matahari *matahari)
+{
+    DBusGMethodInvocation *context = matahari->data;
+    if (res != MH_RES_SUCCESS) {
+        if (matahari->error != NULL) {
+            dbus_g_method_return_error(context, matahari->error);
+            g_error_free(matahari->error);
+            matahari->error = NULL;
+        } else {
+            GError *error = g_error_new(MATAHARI_ERROR, res, mh_result_to_str(res));
+            dbus_g_method_return_error(context, error);
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+## Cache data needed to create callback method and method call handler
+#for cls in $classes
+    #set $clsname = $cls.get('name')
+    #for method in $cls.findall('method')
+        #set $methodname = $method.get('name')
+        ## Arguments for declaration of callback method
+        #set $callbackdefargs = ""
+        ## Arguments for declaration of call handler method
+        #set $declargs = ""
+        #for arg in $method.findall("arg")
+            #set $type = $getType($arg.get('type'))
+            #if $arg.get('dir') != 'O'
+                #if $arg.get('dir') == 'I' and $arg.get('type') in ['sstr', 'lstr']
+                    #set $declargs += "const "
+                #end if
+                #set $declargs += "%s%s, " % ($type.get('ctype'), $arg.get('name').replace("-", "_"))
+            #end if
+            #if $arg.get('dir') != 'I'
+                #set $callbackdefargs += ", %s%s" % ($type.get('ctype'), $arg.get('name').replace("-", "_"))
+            #end if
+        #end for
+## Callback
+gboolean
+${clsname}_${method.get('name')}_callback(Matahari *matahari, enum mh_result _res${$callbackdefargs})
+{
+    #set $args = $method.xpath("arg[@dir != 'I']")
+    #if len($args) > 0
+    DBusMessageIter _iter;
+    #end if
+    DBusGMethodInvocation *_context = matahari->data;
+    gboolean _result = process_error(_res, matahari);
+    if (_result) {
+        DBusMessage *_reply = dbus_g_method_get_reply(_context);
+    #set $args = $method.xpath("arg[@dir != 'I']")
+    #if len($args) > 0
+        dbus_message_iter_init_append(_reply, &_iter);
+        #for arg in $args
+            #set $name = arg.get('name').replace('-', '_')
+            ## Return arguments
+            #if $arg.get('type') == 'list'
+        glist_to_dbus_message_iter(${name}, &_iter);
+            #elif $arg.get('type') == 'map'
+        ghashtable_to_dbus_message_iter(${name}, &_iter);
+            #else
+        dbus_message_iter_append_basic(&_iter, ${type.get('dbus_type')}, &${name});
+            #end if
+        #end for
+    #end if
+        dbus_g_method_send_reply(_context, _reply);
+    }
+    free(matahari);
+    return _result;
+}
+
+## Method call handler
+gboolean
+${clsname}_${methodname}(GMatahari *gmatahari, ${declargs}DBusGMethodInvocation *_context)
+{
+    enum mh_result _res = MH_RES_SUCCESS;
+    GError* _error = NULL;
+        #set $args = ""
+        #set $free = ""
+        #set $callbackargs = ""
+        #for arg in $method.findall("arg")
+            #set $name = $arg.get('name').replace('-', '_')
+            #set $dir = $arg.get('dir')
+            #set $type = $getType($arg.get('type'))
+            ## Argument declaration
+            #set decl = ""
+            #if $dir == 'O'
+                #set $decl += "%s%s = %s;" % ($type.get('ctype'), $name, $type.get('cinit'))
+                #if 'cfree' in $type.keys() and len($type.get('cfree')) > 0
+                    #set $free += "    %s(%s);\n" % ($type.get('cfree'), $name)
+                #end if
+            #end if
+            ## Method call
+            #if $dir == 'I'
+                #set $args += ', ' + $type.get('dbus_to_c') % $name
+            #else
+                #set $args += ', &%s' % $name
+                #set $callbackargs += ', %s' % $name
+            #end if
+            #if len($decl) > 0
+    $decl
+            #end if
+        #end for
+
+    // Check authorization via polkit
+    if (!check_authorization(BUS_NAME ".${methodname}", &_error, _context)) {
+        dbus_g_method_return_error(_context, _error);
+        g_error_free(_error);
+        return FALSE;
+    }
+
+    Matahari *_mh = matahari_clone(gmatahari->matahari, _context, (mh_callback) ${clsname}_${methodname}_callback);
+    _res = mh_${clsname.lower()}_${methodname}(_mh${args});
+    if (_res != MH_RES_ASYNC) {
+        gboolean _result = ${clsname}_${methodname}_callback(_mh, _res${callbackargs});
+        #if len($free) > 0
+        $free.strip()
+        #end if
+        return _result;
+    }
+    return FALSE;
+}
+
+    #end for
+#end for
+
+// Properties and statistics
+
+## Create enum of the properties and first property with id 0
+enum Prop {
+    PROP_0,
+#for cls in $classes
+    #set $CLASS = $cls.get('name').upper()
+    #for prop in $cls.xpath("property|statistic")
+    PROP_${CLASS}_${prop.get('name').upper().replace('-', '_')},
+    #end for
+#end for
+};
+
+void
+gmatahari_init_properties(GObjectClass *gobject_class)
+{
+    GParamSpec *pspec = NULL;
+#for cls in $classes
+    #set $CLASS = $cls.get('name').upper()
+    #for prop in $cls.xpath("property|statistic")
+        #if $prop.get('access') == 'readwrite'
+    pspec = get_paramspec("${prop.get('name')}", "${prop.get('desc')}", "${prop.get('type')}", G_PARAM_READWRITE);
+        #else
+    pspec = get_paramspec("${prop.get('name')}", "${prop.get('desc')}", "${prop.get('type')}", G_PARAM_READABLE);
+        #end if
+    if (pspec) {
+        g_object_class_install_property(gobject_class, PROP_${CLASS}_${prop.get('name').upper().replace('-', '_')}, pspec);
+    } else {
+        g_printerr("Unknown type: ${prop.get('type')}\n");
+    }
+
+    #end for
+#end for
+}
+
+void
+matahari_set_property(GObject *object, guint property_id, const GValue *value,
+                      GParamSpec *pspec)
+{
+#if len($schema.xpath("class/properties[@access='RW']|statistic[@access='RW']")) > 0
+    Matahari *matahari = ((GMatahari *) object)->matahari;
+    switch (property_id) {
+    #for cls in $classes
+        #set $CLASS = $cls.get('name').upper()
+        #for prop in $cls.xpath("property[@access='RW']|statistic[@access='RW']")
+            #set $name = $prop.get('name').lower().replace('-', '_')
+            #set $type = $getType($prop.get('type'))
+    case PROP_${CLASS}_${name.upper()}:
+            mh_${CLASS.lower()}_prop_set_${name}(matahari, g_value_get_${type.get('gtype')}(value));
+            break;
+        #end for
+    #end for
+    }
+#end if
+}
+
+void
+matahari_get_property(GObject *object, guint property_id, GValue *value,
+                      GParamSpec *pspec)
+{
+    Matahari *matahari = ((GMatahari *) object)->matahari;
+    switch ((enum Prop) property_id) {
+    case PROP_0:
+        // Just to silence warning
+        break;
+#for cls in $classes
+    #set $CLASS = $cls.get('name').upper()
+    #for prop in $cls.xpath("property|statistic")
+        #set $name = $prop.get('name').lower().replace('-', '_')
+        #set $type = $getType($prop.get('type'))
+    case PROP_${CLASS}_${name.upper()}:
+        g_value_set_${type.get('gtype')}(value, mh_${CLASS.lower()}_prop_get_${name}(matahari));
+        break;
+    #end for
+#end for
+    }
+}
+
+\#include "$base-dbus-glue.h"
+
+int
+main(int argc, char** argv)
+{
+    GMatahari *gmh = NULL;
+    g_type_init();
+
+    gmh = g_object_new(GMATAHARI_TYPE, NULL);
+    Matahari *matahari = matahari_new();
+    mh_${base}_init(matahari);
+
+    gmh->matahari = matahari;
+
+    return run_dbus_server((GObject *) gmh, BUS_NAME, OBJECT_PATH);
+}

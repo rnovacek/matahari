@@ -119,6 +119,20 @@ pkg_check_modules(python REQUIRED python)
 include_directories(${python_INCLUDE_DIRS})
 endif(NOT WIN32)
 
+# Get path to python binary to PYTHON_EXECUTABLE
+find_package(PythonInterp REQUIRED)
+if(NOT PYTHONINTERP_FOUND)
+    message(FATAL_ERROR "Python not found.")
+endif(NOT PYTHONINTERP_FOUND)
+
+# Check if python-cheetah module is installed
+execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import Cheetah"
+                RESULT_VARIABLE HAVE_CHEETAH
+                OUTPUT_QUIET)
+if(HAVE_CHEETAH GREATER 0)
+    message(FATAL_ERROR "Cheetah Python module not found")
+endif(HAVE_CHEETAH GREATER 0)
+
 # cURL
 if(NOT WIN32)
     find_library(CURL curl)
@@ -204,21 +218,24 @@ add_subdirectory(unittests)
 
 ### Installation
 install(FILES ${SCHEMAS} DESTINATION share/matahari)
+install(FILES schema-to-header.tmpl DESTINATION share/matahari)
+install(FILES generate.py DESTINATION share/matahari)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/matahari.h DESTINATION include)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/matahari/config.h DESTINATION include/matahari)
+install(FILES include/matahari/matahari.h DESTINATION include/matahari)
+install(FILES include/matahari/matahari-private.h DESTINATION include/matahari)
 install(FILES include/matahari/logging.h DESTINATION include/matahari)
 install(FILES include/matahari/utilities.h DESTINATION include/matahari)
 install(FILES include/matahari/errors.h DESTINATION include/matahari)
 install(FILES include/matahari/dnssrv.h DESTINATION include/matahari)
-install(FILES include/matahari/host.h DESTINATION include/matahari)
-install(FILES include/matahari/network.h DESTINATION include/matahari)
 install(FILES include/matahari/rpc.h DESTINATION include/matahari)
-install(FILES include/matahari/sysconfig.h DESTINATION include/matahari)
-install(FILES include/matahari/services.h DESTINATION include/matahari)
+install(FILES include/matahari/services_common.h DESTINATION include/matahari)
+install(FILES include/matahari/sysconfig_common.h DESTINATION include/matahari)
 install(FILES cmake/modules/FindMatahari.cmake DESTINATION share/cmake/Modules)
 install(FILES cmake/modules/MatahariMacros.cmake DESTINATION share/cmake/Modules)
 
 if(WITH-QMF)
+    install(FILES schema-to-qmf-glue.tmpl DESTINATION share/matahari)
     install(FILES cmake/modules/FindQPID.cmake DESTINATION share/cmake/Modules)
     install(FILES include/matahari/agent.h DESTINATION include/matahari)
     install(FILES include/matahari/object.h DESTINATION include/matahari)
@@ -226,6 +243,7 @@ if(WITH-QMF)
 endif(WITH-QMF)
 
 if(WITH-DBUS)
+    install(FILES schema-to-dbus-glue.tmpl DESTINATION share/matahari)
     install(FILES schema-to-dbus.xsl DESTINATION share/matahari)
     install(FILES dbus-to-c.xsl DESTINATION share/matahari)
     install(FILES check-policy.xsl DESTINATION share/matahari)

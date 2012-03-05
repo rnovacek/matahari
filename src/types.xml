@@ -1,0 +1,77 @@
+
+<!--
+<type schema="objId" ctype="" cinit="" qpid_to_c="" dbus_to_c="" />
+-->
+<types>
+<type schema="uint8" ctype="uint8_t " cinit="0" gtype="uint"
+      qpid_to_c="%s.asUint8()"
+      dbus_to_c="%s" dbus_signature="y" dbus_type="DBUS_TYPE_BYTE" />
+<type schema="uint16" ctype="uint16_t " cinit="0" gtype="uint"
+      qpid_to_c="%s.asUint16()"
+      dbus_to_c="%s" dbus_signature="q" dbus_type="DBUS_TYPE_UINT16" />
+<type schema="uint32" ctype="uint32_t " cinit="0"  gtype="uint"
+      qpid_to_c="%s.asUint32()"
+      dbus_to_c="%s" dbus_signature="u" dbus_type="DBUS_TYPE_UINT32" />
+<type schema="uint64" ctype="uint64_t " cinit="0" gtype="uint64"
+      qpid_to_c="%s.asUint64()"
+      dbus_to_c="%s" dbus_signature="t" dbus_type="DBUS_TYPE_UINT64" />
+<type schema="int8" ctype="int8_t " cinit="0"  gtype="char"
+      qpid_to_c="%s.asInt8()"
+      dbus_to_c="%s" dbus_signature="n" dbus_type="DBUS_TYPE_INT16" />
+<type schema="int16" ctype="int16_t " cinit="0" gtype="int"
+      qpid_to_c="%s.asInt16()"
+      dbus_to_c="%s" dbus_signature="n" dbus_type="DBUS_TYPE_INT16" />
+<type schema="int32" ctype="int32_t " cinit="0" gtype="int"
+      qpid_to_c="%s.asInt32()"
+      dbus_to_c="%s" dbus_signature="i" dbus_type="DBUS_TYPE_INT32" />
+<type schema="int64" ctype="int64_t " cinit="0" gtype="int64"
+      qpid_to_c="%s.asInt64()"
+      dbus_to_c="%s" dbus_signature="x" dbus_type="DBUS_TYPE_INT64" />
+<type schema="bool" ctype="bool " cinit="false" gtype="bool"
+      qpid_to_c="%s.asBool()"
+      dbus_to_c="%s" dbus_signature="b" dbus_type="DBUS_TYPE_BOOL" />
+<type schema="sstr" ctype="char *" cinit="NULL" cfree="free"  gtype="string"
+      qpid_to_c="%s.asString().c_str()"
+      dbus_to_c="%s" dbus_signature="s" dbus_type="DBUS_TYPE_STRING" />
+<type schema="lstr" ctype="char *" cinit="NULL" cfree="free"  gtype="string"
+      qpid_to_c="%s.asString().c_str()"
+      dbus_to_c="%s" dbus_signature="s" dbus_type="DBUS_TYPE_STRING" />
+
+<type schema="absTime" ctype="int64_t" cinit="0"  gtype="int64"
+      qpid_to_c="%s.getLongLong()"
+      dbus_to_c="%s" dbus_signature="x" dbus_type="DBUS_TYPE_INT64" />
+
+<!--
+<type schema="deltaTime"
+-->
+<type schema="float" ctype="float " cinit="0"  gtype="float"
+      qpid_to_c="%s.asFloat()"
+      dbus_to_c="%s" dbus_signature="d" dbus_type="DBUS_TYPE_DOUBLE"/>
+<type schema="double" ctype="double " cinit="0"  gtype="double"
+      qpid_to_c="%s.asDouble()"
+      dbus_to_c="%s" dbus_signature="d" dbus_type="DBUS_TYPE_DOUBLE" />
+<!--
+<type schema="uuid"
+-->
+<type schema="map" ctype="GHashTable *" cinit="g_hash_table_new_full(g_str_hash, g_str_equal, free, NULL)" cfree="g_hash_table_free_full" gtype="boxed"
+      qpid_to_c="qpidMapToGHashTable(%s.asMap())" c_to_qpid="gHashTableToQpidMap(%s)"
+      dbus_to_c="%s" dbus_signature="a{sv}" dbus_type="COMPLEX - do not use" c_to_dbus="ghashtable_to_dbus_message_iter(%s)" />
+<type schema="list" ctype="GList *" cinit="NULL" cfree="g_list_free" gtype="boxed"
+      qpid_to_c="qpidListToGList(%s.asList())" c_to_qpid="gListToQpidList(%s)"
+      dbus_to_c="%s" dbus_signature="av" dbus_type="COMPLEX - do not use" c_to_dbus="glist_to_dbus_message_iter(%s)" />
+
+<!--
+TODO: implement following types
+hilo8
+hilo16
+hilo32
+hilo64
+count8
+count16
+count32
+count64
+mma32
+mma64
+mmaTime
+-->
+</types>

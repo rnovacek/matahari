@@ -19,6 +19,44 @@
 #ifndef __MH_SERVICES_PRIVATE_H__
 #define __MH_SERVICES_PRIVATE_H__
 
+typedef struct mainloop_fd_s mainloop_fd_t;
+
+typedef struct svc_action_private_s svc_action_private_t;
+typedef struct svc_action_s
+{
+    char *id;
+    char *rsc;
+    char *action;
+    int   interval;
+
+    char *standard;
+    char *provider;
+    char *agent;
+
+    int         timeout;
+    GHashTable *params;
+
+    int rc;
+    int pid;
+    int status;
+    int sequence;
+    int expected_rc;
+
+    char          *stderr_data;
+    char          *stdout_data;
+
+    /**
+     * Data stored by the creator of the action.
+     *
+     * This may be used to hold data that is needed later on by a callback,
+     * for example.
+     */
+    void *cb_data;
+
+    svc_action_private_t *opaque;
+
+} svc_action_t;
+
 struct svc_action_private_s {
     char *exec;
     char *args[7];

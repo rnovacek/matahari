@@ -46,6 +46,7 @@
 #include "matahari/logging.h"
 #include "matahari/dnssrv.h"
 #include "matahari/utilities.h"
+#include <glib.h>
 
 #ifndef WIN32
 #include <unistd.h>
@@ -607,7 +608,7 @@ mh_should_daemonize(int code, const char *name, const char *arg, void *userdata)
     return 0;
 }
 
-MatahariAgent::MatahariAgent(): _impl(new MatahariAgentImpl())
+MatahariAgent::MatahariAgent(): interval(5), _impl(new MatahariAgentImpl())
 {
 
 }
@@ -821,4 +822,106 @@ mainloop_destroy_qmf(mainloop_qmf_t *source)
     g_source_unref((GSource *) source);
 
     return TRUE;
+}
+
+typedef qpid::types::Variant qVariant;
+
+GVariant *
+qpidVariantToGVariant(const qVariant &v)
+{
+    GVariant **array;
+    qVariant::List::const_iterator itL, endL;
+    qVariant::Map::const_iterator itM, endM;
+    int i = 0;
+
+    switch (v.getType()) {
+        case qpid::types::VAR_VOID:
+            return NULL;
+        case qpid::types::VAR_BOOL:
+            return g_variant_new_boolean(v.asBool());
+        case qpid::types::VAR_INT8:
+            // TODO: what type?
+            return g_variant_new_int16(v.asInt8());
+        case qpid::types::VAR_INT16:
+            return g_variant_new_int16(v.asInt16());
+        case qpid::types::VAR_INT32:
+            return g_variant_new_int32(v.asInt32());
+        case qpid::types::VAR_INT64:
+            return g_variant_new_int64(v.asInt64());
+        case qpid::types::VAR_UINT8:
+            return g_variant_new_byte(v.asUint8());
+        case qpid::types::VAR_UINT16:
+            return g_variant_new_uint16(v.asUint16());
+        case qpid::types::VAR_UINT32:
+            return g_variant_new_uint32(v.asUint32());
+        case qpid::types::VAR_UINT64:
+            return g_variant_new_uint64(v.asUint64());
+        case qpid::types::VAR_FLOAT:
+            return g_variant_new_double(v.asFloat());
+        case qpid::types::VAR_DOUBLE:
+            return g_variant_new_double(v.asDouble());
+        case qpid::types::VAR_STRING:
+            return g_variant_new_string(v.asString().c_str());
+        case qpid::types::VAR_LIST:
+            array = (GVariant **) malloc(v.asList().size() * sizeof(GVariant *));
+            endL = v.asList().end();
+            for (itL = v.asList().begin(); itL != endL; itL++) {
+                array[i] = qpidVariantToGVariant(*itL);
+                i++;
+            }
+            return g_variant_new_array(G_VARIANT_TYPE_VARIANT, array,
+                                       v.asList().size());
+        case qpid::types::VAR_MAP:
+            array = (GVariant **) malloc(v.asMap().size() * sizeof(GVariant *));
+            endM = v.asMap().end();
+            for (itM = v.asMap().begin(); itM != endM; itM++) {
+                array[i] = g_variant_new_dict_entry(g_variant_new_string(
+                        itM->first.c_str()), qpidVariantToGVariant(itM->second));
+                i++;
+            }
+            return g_variant_new_array(G_VARIANT_TYPE_DICTIONARY, array,
+                                       v.asMap().size());
+        case qpid::types::VAR_UUID:
+            return g_variant_new_string(v.asUuid().str().c_str());
+    }
+    return NULL;
+}
+
+qpid::types::Variant::List
+gListToQpidList(GList *list)
+{
+    GList *plist;
+    _qtype::Variant::List s_list;
+
+    for (plist = g_list_first(list); plist;
+         plist = g_list_next(plist)) {
+        s_list.push_back((const char *) plist->data);
+    }
+    return s_list;
+}
+
+qpid::types::Variant::Map
+gHashTableToQpidMap(GHashTable *table)
+{
+    GHashTableIter iter;
+    qpid::types::Variant::Map s_map;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, table);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        s_map[(const char *) key] = qpid::types::Variant((const char *) value);
+    }
+    return s_map;
+}
+
+GHashTable *
+qpidMapToGHashTable(const qpid::types::Variant::Map &map)
+{
+    GHashTable *table = g_hash_table_new_full(g_str_hash, g_str_equal, free, NULL);
+    qpid::types::Variant::Map::const_iterator it, end = map.end();
+    for (it = map.begin(); it != end; it++) {
+        g_hash_table_insert(table, strdup(it->first.c_str()),
+                            qpidVariantToGVariant(it->second));
+    }
+    return table;
 }

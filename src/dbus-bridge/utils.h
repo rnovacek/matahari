@@ -19,7 +19,7 @@
 #ifndef MH_DBUSBRIDGE_UTILS_H
 #define MH_DBUSBRIDGE_UTILS_H
 
-#include <glib/gerror.h>
+#include <glib.h>
 #include <dbus/dbus.h>
 #include <string>
 #include <map>
@@ -66,10 +66,6 @@ typedef union
     unsigned char byt;
     char         *str;
 } DBusBasicValue;
-
-#define MATAHARI_ERROR matahari_error_quark()
-GQuark
-matahari_error_quark(void);
 
 // Default timeout for all calls with timeout
 #define CALL_TIMEOUT 10000

@@ -29,7 +29,7 @@
 
 #include "matahari/logging.h"
 #include "matahari/mainloop.h"
-#include "matahari/services.h"
+#include "matahari/services_common.h"
 
 #include "services_private.h"
 #include "sigar.h"
@@ -358,6 +358,7 @@ services_os_action_execute(svc_action_t* op, gboolean synchronous)
             int killrc = sigar_proc_kill(op->pid, 9 /*SIGKILL*/);
 
             op->status = LRM_OP_TIMEOUT;
+            op->rc = OCF_TIMEOUT;
             mh_warn("%s:%d - timed out after %dms", op->id, op->pid,
                     op->timeout);
 

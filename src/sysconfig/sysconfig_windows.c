@@ -57,14 +57,14 @@ run_regedit(char *registry_file)
 
 enum mh_result
 sysconfig_os_run_uri(const char *uri, uint32_t flags, const char *scheme,
-        const char *key, mh_sysconfig_result_cb result_cb, void *cb_data)
+                     const char *key, mh_callback result_cb, void *cb_data)
 {
     return MH_RES_NOT_IMPLEMENTED;
 }
 
 enum mh_result
 sysconfig_os_run_string(const char *string, uint32_t flags, const char *scheme,
-        const char *key, mh_sysconfig_result_cb result_cb, void *cb_data)
+                        const char *key, mh_callback result_cb, void *cb_data)
 {
     if (!strcasecmp(scheme, "registry")) {
         char filename[PATH_MAX];

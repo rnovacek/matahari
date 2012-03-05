@@ -1,0 +1,344 @@
+
+#set $AgentClass = $schema.find("class").get("name")
+#set $package = $schema.getroot.get("package")
+#set $base = $AgentClass.lower()
+#set $hasStatistics = len($schema.xpath("class/statistic")) > 0
+#set $classes = $schema.findall("class")
+extern "C" {
+    \#include "${base}.h"
+}
+\#include "matahari/agent.h"
+\#include "matahari/errors.h"
+\#include "matahari/logging.h"
+\#include "matahari/matahari-private.h"
+\#include "qmf/${package.replace(".", "/")}/QmfPackage.h"
+
+struct Matahari;
+
+class $AgentClass : public MatahariAgent
+{
+public:
+    virtual int setup(qmf::AgentSession session);
+    void updateProperties();
+    void emit(const char *name, va_list *v);
+
+    virtual gboolean invoke(qmf::AgentSession session, qmf::AgentEvent event, gpointer user_data);
+
+#if $hasStatistics
+    static gboolean updateStatistics_timer(gpointer data);
+private:
+    int updateStatistics();
+#else
+private:
+#end if
+#for cls in $classes
+    #set $name = cls.get('name').lower()
+    gboolean invoke_${name}(qmf::AgentSession session, qmf::AgentEvent event, gpointer user_data);
+    qmf::Data _$name;
+    static const char ${name.upper()}_NAME[];
+#end for
+    Matahari *matahari;
+    Matahari *mh_clone(qmf::AgentEvent _event, mh_callback _callback);
+    qmf::${package.replace(".", "::")}::PackageDefinition _package;
+};
+
+struct CBData {
+    Matahari *matahari;
+    $AgentClass *agent;
+    qmf::AgentSession &session;
+    qmf::AgentEvent event;
+    CBData(Matahari *_matahari, $AgentClass *_agent, qmf::AgentSession &_session, qmf::AgentEvent _event)
+        : matahari(_matahari), agent(_agent), session(_session), event(_event) {}
+};
+
+/**
+ * Create the clone of Matahari struct to be used in library method call.
+ * The clone will be freed in the callback.
+ */
+Matahari *
+${AgentClass}::mh_clone(qmf::AgentEvent _event, mh_callback _callback)
+{
+    Matahari *mh = matahari_new();
+    mh->priv = matahari->priv;
+    mh->update_properties_func = matahari->update_properties_func;
+    mh->emit_event_func = matahari->emit_event_func;
+    mh->callback = _callback;
+    mh->data = new CBData(mh, this, getSession(), _event);
+    return mh;
+}
+
+#for cls in $classes
+const char ${AgentClass}::${cls.get('name').upper()}_NAME[] = "${cls.get('name')}";
+#end for
+
+#if $hasStatistics
+gboolean
+${AgentClass}::updateStatistics_timer(gpointer data)
+{
+    $AgentClass *agent = ($AgentClass *) data;
+    g_timeout_add(agent->updateStatistics(), updateStatistics_timer, data);
+    return FALSE;
+}
+#end if
+
+int
+main(int argc, char **argv)
+{
+    $AgentClass *agent = new ${AgentClass}();
+    int rc = agent->init(argc, argv, "${AgentClass}");
+    if (rc == 0) {
+        mainloop_track_children(G_PRIORITY_DEFAULT);
+        agent->run();
+    }
+
+    return rc;
+}
+
+bool
+process_error(enum mh_result res, Matahari *matahari)
+{
+    CBData *_data = (CBData *) matahari->data;
+    if (res != MH_RES_SUCCESS) {
+        if (matahari->error != NULL) {
+            _data->session.raiseException(_data->event, matahari->error->message);
+            g_error_free(matahari->error);
+            matahari->error = NULL;
+        } else {
+            _data->session.raiseException(_data->event, mh_result_to_str(res));
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean
+$AgentClass::invoke(qmf::AgentSession session, qmf::AgentEvent event, gpointer user_data)
+{
+    if (event.getType() == qmf::AGENT_METHOD && event.hasDataAddr()) {
+        // Select class whose callback will be called
+#for cls in $classes
+        if (event.getDataAddr().getName() == ${cls.get('name').upper()}_NAME) {
+            return invoke_${cls.get('name').lower()}(session, event, user_data);
+        } else
+#end for
+        {
+            mh_err("Unknown agent: %s", event.getDataAddr().getName().c_str());
+            return TRUE;
+        }
+    }
+
+    mh_err("Unhandled message");
+    return TRUE;
+}
+
+## Method callbacks
+#for cls in $classes
+    #for method in $cls.findall('method')
+        ## Get argument declaration for the callback
+        #set $args = ""
+        ## Get return arguments
+        #set $returns = ""
+        #for arg in $method.findall('arg')
+            #set $name = $arg.get('name').replace('-', '_')
+            #set $dir = $arg.get('dir')
+            #set $type = $getType($arg.get('type'))
+            ## Return arguments
+            #if $dir != 'I'
+                #set $args += ", %s%s" % ($type.get('ctype'), $name)
+                #set $returns += '_data->event.addReturnArgument("%s", %s);\n        ' % ($arg.get('name'), ($type.get('c_to_qpid') or "%s") % $arg.get('name'))
+            #end if
+        #end for
+void
+${cls.get('name')}_${method.get('name')}_callback(Matahari *matahari, enum mh_result _res${args})
+{
+    CBData *_data = (CBData *) matahari->data;
+    if (process_error(_res, matahari)) {
+        ## Return arguments
+        #if len($returns) > 0
+        $returns
+        #slurp
+        #end if
+        _data->session.methodSuccess(_data->event);
+    }
+    delete _data;
+    free(matahari);
+}
+
+    #end for
+#end for
+
+#for cls in $classes
+    #set $clsname = $cls.get('name').lower()
+gboolean
+$AgentClass::invoke_${clsname}(qmf::AgentSession session, qmf::AgentEvent event, gpointer user_data)
+{
+    if (event.getType() != qmf::AGENT_METHOD) {
+        return TRUE;
+    }
+
+    enum mh_result res = MH_RES_SUCCESS;
+    const std::string& methodName(event.getMethodName());
+    qpid::types::Variant::Map& args = event.getArguments();
+
+    #for method in $cls.findall("method")
+    if (methodName == "${method.get('name')}") {
+        ## During one iteration through all arguments the argument declaration will be
+        ## printed, and variables with method call, return of result argument and freeing
+        ## will be constructed
+        ##
+        ## arguments for the library call
+        #set $callargs = ""
+        ## arguments for the callback function
+        #set $out_args = ""
+        ## Free the out arguments
+        #set $free = ""
+        #for arg in $method.findall("arg")
+            #set $name = $arg.get('name').replace('-', '_')
+            #set $dir = $arg.get('dir')
+            #set $type = $getType($arg.get('type'))
+            ## Argument declaration
+            #set $decl = ""
+            #if $dir == 'IO'
+                #set $init = $type.get('qpid_to_c') % ('args["%s"]' % $name)
+                #if $arg.get('type') in ['sstr', 'lstr']
+                    #set $init = 'strdup(%s)' % $init
+                #end if
+                #set $decl = '%s%s = %s;' % ($type.get('ctype'), $name, $init)
+                #set $out_args += ", %s" % ($name)
+            #elif $dir == 'O'
+                #set $decl += "%s%s = %s;" % ($type.get('ctype'), $name, $type.get('cinit'))
+                #set $out_args += ", %s" % ($name)
+            #end if
+            ## Method call
+            #if $dir == 'I'
+                #set $callargs += ', ' + $type.get('qpid_to_c') % ('args["%s"]' % $name)
+            #else
+                #set $callargs += ', &%s' % $name
+                ## Free
+                #if 'cfree' in $type.keys() and len($type.get('cfree')) > 0
+                    #set $free += '%s(%s);\n' % ($type.get('cfree'), $name)
+                #end if
+            #end if
+            #if len($decl) > 0
+        $decl
+            #end if
+        #end for
+        Matahari *mh = mh_clone(event, (mh_callback) ${cls.get('name')}_${method.get('name')}_callback);
+        // Call the method
+        res = mh_${clsname}_${method.get('name')}(mh${callargs});
+        if (res != MH_RES_ASYNC) {
+            ${cls.get('name')}_${method.get('name')}_callback(mh, res${out_args});
+            #if len($free) > 0
+            $free
+            #end if
+        }
+        return TRUE;
+    } else #slurp
+    #end for
+    {
+        session.raiseException(event, mh_result_to_str(MH_RES_NOT_IMPLEMENTED));
+    }
+
+    return TRUE;
+}
+#end for
+
+/* Callback for QMF agent */
+void
+update_properties(Matahari *matahari)
+{
+    ((CBData *) matahari->data)->agent->updateProperties();
+}
+
+void
+emit_event(Matahari *matahari, const char *name, ...)
+{
+    va_list v;
+    va_start(v, name);
+    ((CBData *) matahari->data)->agent->emit(name, &v);
+    va_end(v);
+}
+
+int
+$AgentClass::setup(qmf::AgentSession session)
+{
+    matahari = matahari_new();
+    mh_${base}_init(matahari);
+    matahari->update_properties_func = ::update_properties;
+    matahari->emit_event_func = ::emit_event;
+    qmf::AgentEvent ev;
+    matahari->data = new CBData(matahari, this, session, ev);
+
+    _package.configure(session);
+#for cls in $classes
+    #set $name = cls.get('name').replace('-', '_')
+    _${name.lower()} = qmf::Data(_package.data_$name);
+#end for
+    updateProperties();
+
+#for cls in $classes
+    #set $name = cls.get('name').replace('-', '_')
+    session.addData(_${name.lower()}, ${name.upper()}_NAME);
+#end for
+#if $hasStatistics
+    updateStatistics_timer(this);
+#end if
+    return 0;
+}
+
+void
+$AgentClass::updateProperties()
+{
+#for cls in $classes
+    #for arg in cls.findall("property")
+        #set $name = $arg.get('name').lower().replace('-', '_')
+        #set $type = $getType($arg.get('type'))
+        #set $call = "mh_%s_prop_get_%s(matahari)" % ($cls.get('name').lower(), $name)
+        #set $value = ($type.get('c_to_qpid') or "%s") % $call
+    _${cls.get('name').lower()}.setProperty("${arg.get('name')}", $value);
+    #end for
+#end for
+}
+
+#if $hasStatistics
+int
+$AgentClass::updateStatistics()
+{
+#for cls in $classes
+    #for arg in cls.findall("statistic")
+        #set $name = $arg.get('name').lower().replace('-', '_')
+        #set $type = $getType($arg.get('type'))
+        #set $call = "mh_%s_prop_get_%s(matahari)" % ($cls.get('name').lower(), $name)
+        #set $value = ($type.get('c_to_qpid') or "%s") % $call
+    _${cls.get('name').lower()}.setProperty("${arg.get('name')}", $value);
+    #end for
+#end for
+    // TODO: customizable statistics update interval
+    return interval * 1000;
+}
+#end if
+
+void
+$AgentClass::emit(const char *name, va_list *v)
+{
+    if (name == NULL) {
+        mh_warn("Unnamed event!");
+        return;
+#for event in $schema.findall("event")
+    } else if (strcmp(name, "${event.get('name')}") == 0) {
+        qmf::Data event(_package.event_${event.get('name')});
+    #for arg in $event.get('args').split(',')
+        #set $typename = $schema.xpath("eventArguments/arg[@name='%s']/@type" % $arg)[0]
+        #set $type = $getType($typename)
+        event.setProperty("$arg", va_arg(v, ${type.get('ctype')}));
+    #end for
+        try {
+            getSession().raiseEvent(event);
+        } catch (const qpid::messaging::ConnectionError& e) {
+            mh_log(LOG_ERR, "Connection error sending event to broker. (%s)", e.what());
+        } catch (const qpid::types::Exception& e) {
+            mh_log(LOG_ERR, "Exception sending event to broker. (%s)", e.what());
+        }
+#end for
+    }
+}

@@ -36,8 +36,11 @@
 #include <cxxtest/TestSuite.h>
 
 extern "C" {
-#include "matahari/host.h"
+#include "host/host.h"
 #include "mh_test_utilities.h"
+#include "matahari/errors.h"
+#include "matahari/matahari-private.h"
+#include "matahari/matahari.h"
 #include <sigar.h>
 #include <sigar_format.h>
 #include <glib.h>
@@ -52,149 +55,159 @@ class MhApiHostSuite : public CxxTest::TestSuite
  public:
     std::stringstream infomsg;
     std::stringstream errmsg;
+    Matahari *matahari;
+
+    MhApiHostSuite()
+    {
+        matahari = matahari_new();
+        mh_host_init(matahari);
+    }
 
     void testHostName(void)
     {
-        infomsg << "Verify " << mh_host_get_hostname() << " format";
+        infomsg << "Verify " << mh_host_prop_get_hostname(matahari) << " format";
         TS_TRACE(infomsg.str());
         /* http://stackoverflow.com/questions/1418423/the-hostname-regex */
         TS_ASSERT((mh_test_is_match("^(?=.{1,255}$)[0-9A-Za-z](?:(?:[0-9A-Za-z]|\\b-){0,61}[0-9A-Za-z])?(?:\\.[0-9A-Za-z](?:(?:[0-9A-Za-z]|\\b-){0,61}[0-9A-Za-z])?)*\\.?$",
-                        mh_host_get_hostname())) >= 0);
+                                    mh_host_prop_get_hostname(matahari))) >= 0);
         infomsg.str("");
     }
 
     void testUuid(void)
     {
         const char *lifetime = NULL;
-        infomsg << "Verify " << mh_host_get_uuid(lifetime) << " exists";
+        char *uuid = NULL;
+        mh_host_get_uuid(matahari, lifetime, &uuid);
+        infomsg << "Verify " << uuid << " exists";
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_test_is_match("^[0-9a-zA-Z]+$", mh_host_get_uuid(lifetime))) >= 0);
+        TS_ASSERT((mh_test_is_match("^[0-9a-zA-Z]+$", uuid)) >= 0);
         infomsg.str("");
     }
 
     void testOperatingSystem(void)
     {
-        infomsg << "Verify OS : " << mh_host_get_operating_system();
+        infomsg << "Verify OS : " << mh_host_prop_get_os(matahari);
         TS_TRACE(infomsg.str());
         TS_ASSERT((mh_test_is_match("^Linux.*|Windows.*|Solaris.*$",
-                            mh_host_get_operating_system())) >= 0);
+                                    mh_host_prop_get_os(matahari))) >= 0);
         infomsg.str("");
     }
 
     void testArchitecture(void)
     {
         infomsg << "Verify architecture property: " \
-                << mh_host_get_architecture();
+                << mh_host_prop_get_arch(matahari);
         TS_TRACE(infomsg.str());
         TS_ASSERT((mh_test_is_match("^[0-9a-zA-Z_]+$",
-                            mh_host_get_architecture())) >= 0);
+                                    mh_host_prop_get_arch(matahari))) >= 0);
         infomsg.str("");
     }
 
     void testCpuModel(void)
     {
-        infomsg << "Verify cpu model: " << mh_host_get_cpu_model();
+        infomsg << "Verify cpu model: " << mh_host_prop_get_cpu_model(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_test_is_match("\\sCPU\\s", mh_host_get_cpu_model())) >= 0);
+        TS_ASSERT((mh_test_is_match("\\sCPU\\s", mh_host_prop_get_cpu_model(matahari))) >= 0);
         infomsg.str("");
     }
 
     void testCpuFlags(void)
     {
-        infomsg << "Verify cpu flags: " << mh_host_get_cpu_flags();
+        infomsg << "Verify cpu flags: " << mh_host_prop_get_cpu_flags(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_test_is_match("\\d+", mh_host_get_cpu_flags())) >= 0);
+        TS_ASSERT((mh_test_is_match("\\d+", mh_host_prop_get_cpu_flags(matahari))) >= 0);
         infomsg.str("");
     }
 
     void testCpuCount(void)
     {
-        infomsg << "Verify cpu count: " << mh_host_get_cpu_count();
+        infomsg << "Verify cpu count: " << (unsigned int) mh_host_prop_get_cpu_count(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_cpu_count()) > 0);
+        TS_ASSERT((mh_host_prop_get_cpu_count(matahari)) > 0);
         infomsg.str("");
     }
 
     void testCpuNumberOfCores(void)
     {
-        infomsg << "Verify cpu num of cores: " << mh_host_get_cpu_number_of_cores();
+        infomsg << "Verify cpu num of cores: " << (unsigned int) mh_host_prop_get_cpu_cores(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_cpu_number_of_cores()) > 0);
+        TS_ASSERT((mh_host_prop_get_cpu_cores(matahari)) > 0);
         infomsg.str("");
     }
 
     void testCpuWordSize(void)
     {
-        infomsg << "Verify cpu wordsize: " << mh_host_get_cpu_wordsize();
+        infomsg << "Verify cpu wordsize: " << (unsigned int) mh_host_prop_get_wordsize(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_cpu_wordsize()) > 0);
+        TS_ASSERT((mh_host_prop_get_wordsize(matahari)) > 0);
         infomsg.str("");
     }
 
     void testMemory(void)
     {
-        infomsg << "Verify memory exist: " << mh_host_get_memory();
+        infomsg << "Verify memory exist: " << mh_host_prop_get_memory(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_memory()) > 0);
+        TS_ASSERT((mh_host_prop_get_memory(matahari)) > 0);
         infomsg.str("");
     }
 
     void testMemoryFree(void)
     {
-        infomsg << "Verify memory free: " << mh_host_get_mem_free();
+        infomsg << "Verify memory free: " << mh_host_prop_get_free_mem(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_mem_free()) > 0);
+        TS_ASSERT((mh_host_prop_get_free_mem(matahari)) > 0);
         infomsg.str("");
     }
 
     void testSwap(void)
     {
-        infomsg << "Verify swap exists: " << mh_host_get_swap();
+        infomsg << "Verify swap exists: " << mh_host_prop_get_swap(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_swap()) > 0);
+        TS_ASSERT((mh_host_prop_get_swap(matahari)) > 0);
         infomsg.str("");
     }
 
     void testSwapFree(void)
     {
-        infomsg << "Verify swap free: " << mh_host_get_swap_free();
+        infomsg << "Verify swap free: " << mh_host_prop_get_free_swap(matahari);
         TS_TRACE(infomsg.str());
-        TS_ASSERT((mh_host_get_swap_free()) > 0);
+        TS_ASSERT((mh_host_prop_get_free_swap(matahari)) > 0);
         infomsg.str("");
     }
 
     void testPowerManagement(void)
     {
         char *original, *newProfile;
-        const char *profile;
-        GList *profiles;
+        char *profile;
+        GList *profiles = NULL;
         guint len;
+        unsigned int status;
 
         srand(time(NULL));
 
         // Save the original profile
-        TS_ASSERT(mh_host_get_power_profile(&original) == MH_RES_SUCCESS);
+        TS_ASSERT(mh_host_get_power_profile(matahari, &original) == MH_RES_SUCCESS);
 
         // List all profiles
-        profiles = mh_host_list_power_profiles();
+        TS_ASSERT(mh_host_list_power_profiles(matahari, &profiles) == MH_RES_SUCCESS);
         len = g_list_length(profiles);
 
         // Check if at least one profile is present
         TS_ASSERT(len > 0);
 
         // Choose random profile
-        profile = (const char *) g_list_nth(profiles, rand() % len)->data;
+        profile = (char *) g_list_nth(profiles, rand() % len)->data;
 
         // Set it
-        TS_ASSERT(mh_host_set_power_profile(profile) == MH_RES_SUCCESS);
+        TS_ASSERT(mh_host_set_power_profile(matahari, profile, &status) == MH_RES_SUCCESS);
 
         // Check if the profile is set
-        TS_ASSERT(mh_host_get_power_profile(&newProfile) == MH_RES_SUCCESS);
+        TS_ASSERT(mh_host_get_power_profile(matahari, &newProfile) == MH_RES_SUCCESS);
 
         TS_ASSERT(strcmp(newProfile, profile) == 0);
 
         // Restore original profile
-        TS_ASSERT(mh_host_set_power_profile(original) == MH_RES_SUCCESS);
+        TS_ASSERT(mh_host_set_power_profile(matahari, original, &status) == MH_RES_SUCCESS);
 
         free(original);
         free(newProfile);

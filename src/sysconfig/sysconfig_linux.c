@@ -32,8 +32,9 @@
 
 #include "matahari/logging.h"
 #include "matahari/utilities.h"
-#include "matahari/services.h"
-#include "matahari/sysconfig.h"
+#include "matahari/services_common.h"
+#include "matahari/sysconfig_common.h"
+#include "service/services_private.h"
 
 #include "utilities_private.h"
 #include "sysconfig_private.h"
@@ -43,7 +44,7 @@ MH_TRACE_INIT_DATA(mh_sysconfig);
 struct action_data {
     char *key;
     char *filename;
-    mh_sysconfig_result_cb result_cb;
+    mh_callback result_cb;
     void *cb_data;
 };
 
@@ -118,18 +119,20 @@ return_cleanup:
 static void
 action_cb(svc_action_t *action)
 {
+    enum mh_result res = MH_RES_SUCCESS;
     struct action_data *action_data = action->cb_data;
     char buf[32] = "OK";
 
     if (action->rc) {
         snprintf(buf, sizeof(buf), "FAILED\n%d", action->rc);
-    }
+}
 
     if (mh_sysconfig_set_configured(action_data->key, buf) != MH_RES_SUCCESS) {
         mh_err("Unable to write to key file '%s'", action_data->key);
+        res = MH_RES_BACKEND_ERROR;
     }
 
-    action_data->result_cb(action_data->cb_data, action->rc);
+    action_data->result_cb(action_data->cb_data, res, buf);
 
     if (action_data->filename) {
         unlink(action_data->filename);
@@ -197,7 +200,7 @@ return_cleanup:
 
 static enum mh_result
 run_puppet(const char *uri, int oneoff, const char *data, const char *key,
-           mh_sysconfig_result_cb result_cb, void *cb_data)
+           mh_callback result_cb, void *cb_data)
 {
     int i;
     int written;
@@ -296,7 +299,7 @@ run_puppet(const char *uri, int oneoff, const char *data, const char *key,
         goto return_failure;
     }
 
-    return MH_RES_SUCCESS;
+    return MH_RES_ASYNC;
 
 return_failure:
     if (action) {
@@ -320,7 +323,7 @@ return_failure:
 
 static enum mh_result
 run_augeas(const char *uri, const char *data, const char *key,
-           mh_sysconfig_result_cb result_cb, void *cb_data)
+           mh_callback result_cb, void *cb_data)
 {
 #ifdef HAVE_AUGEAS
     int fd;
@@ -417,17 +420,17 @@ run_augeas(const char *uri, const char *data, const char *key,
     if (result < 0) {
         asprintf(&result_str, "FAILED\n%d\n%s", result, value);
         mh_sysconfig_set_configured(key, result_str);
-        result_cb(cb_data, MH_RES_SUCCESS);
+        result_cb(cb_data, MH_RES_SUCCESS, result_str);
     } else {
         asprintf(&result_str, "OK\n%s", value);
         mh_sysconfig_set_configured(key, result_str);
-        result_cb(cb_data, MH_RES_SUCCESS);
+        result_cb(cb_data, MH_RES_SUCCESS, result_str);
     }
 
-    free(result_str);
     unlink(filename);
 
-    return MH_RES_SUCCESS;
+    // Already returned using result_cb
+    return MH_RES_ASYNC;
 #else /* HAVE_AUGEAS */
     return MH_RES_NOT_IMPLEMENTED;
 #endif /* HAVE_AUGEAS */
@@ -452,15 +455,16 @@ sysconfig_os_query_augeas(const char *query)
 
 enum mh_result
 sysconfig_os_run_uri(const char *uri, uint32_t flags, const char *scheme,
-        const char *key, mh_sysconfig_result_cb result_cb, void *cb_data)
+                     const char *key, mh_callback result_cb, void *cb_data)
 {
     enum mh_result rc = MH_RES_SUCCESS;
+    char *status;
 
-    if (mh_sysconfig_is_configured(key) && !(flags & MH_SYSCONFIG_FLAG_FORCE)) {
+    if ((status = mh_sysconfig_get_key(key)) && !(flags & MH_SYSCONFIG_FLAG_FORCE)) {
         /*
          * Already configured and not being forced.  Report success now.
          */
-        result_cb(cb_data, rc);
+        result_cb(cb_data, rc, status);
         return rc;
     }
 
@@ -471,17 +475,18 @@ sysconfig_os_run_uri(const char *uri, uint32_t flags, const char *scheme,
     } else {
         rc = MH_RES_INVALID_ARGS;
     }
-
+    free(status);
     return rc;
 }
 
 enum mh_result
 sysconfig_os_run_string(const char *string, uint32_t flags, const char *scheme,
-        const char *key, mh_sysconfig_result_cb result_cb, void *cb_data)
+                        const char *key, mh_callback result_cb, void *cb_data)
 {
     enum mh_result rc = MH_RES_SUCCESS;
+    char *status;
 
-    if (mh_sysconfig_is_configured(key) && !(flags & MH_SYSCONFIG_FLAG_FORCE)) {
+    if ((status = mh_sysconfig_get_key(key)) && !(flags & MH_SYSCONFIG_FLAG_FORCE)) {
         /*
          * Already configured and not being forced.  Report success now.
          */
@@ -496,7 +501,7 @@ sysconfig_os_run_string(const char *string, uint32_t flags, const char *scheme,
     } else {
         rc = MH_RES_INVALID_ARGS;
     }
-
+    free(status);
     return rc;
 }
 

@@ -26,18 +26,14 @@
 #include <glib.h>
 #include <dbus/dbus-glib.h>
 
+typedef struct DBusMessageIter DBusMessageIter;
+
 /* GObject class definition */
 #include "matahari/gobject_class.h"
 
 /* Private struct in Matahari class */
-#define MATAHARI_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), \
-        MATAHARI_TYPE, MatahariPrivate))
-
-// Matahari error codes
-#define MATAHARI_ERROR matahari_error_quark ()
-
-GQuark
-matahari_error_quark (void);
+#define GMATAHARI_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), \
+        GMATAHARI_TYPE, GMatahariPrivate))
 
 /**
  * Check the authorization for given 'action' using PolicyKit. Returns TRUE if
@@ -61,14 +57,14 @@ extern Property properties[];
  * Start DBus server with name 'bus_name' and object path 'object_path'
  */
 int
-run_dbus_server(char *bus_name, char *object_path);
+run_dbus_server(GObject *obj, char *bus_name, char *object_path);
 
 /**
  * Check the authorization for getting the parameter 'name' using PolicyKit
  * action interface.name
  */
 gboolean
-matahari_get(Matahari* matahari, const char *interface, const char *name,
+matahari_get(GMatahari* matahari, const char *interface, const char *name,
              DBusGMethodInvocation *context);
 
 /**
@@ -76,7 +72,7 @@ matahari_get(Matahari* matahari, const char *interface, const char *name,
  * action interface.name
  */
 gboolean
-matahari_set(Matahari *matahari, const char *interface, const char *name,
+matahari_set(GMatahari *matahari, const char *interface, const char *name,
              GValue *value, DBusGMethodInvocation *context);
 
 /**
@@ -98,37 +94,30 @@ matahari_set_property(GObject *object, guint property_id, const GValue *value,
                       GParamSpec *pspec);
 
 /**
- * This method is used to determine type of value in all dictionary parameters.
- * It must be implemented in each module.
+ * Get GParamSpec structure for known types
+ *
+ * \param name name of the argument
+ * \param desc description of the argument
+ * \param type name of the type (from schema.xml)
+ * \param flags G_PARAM_READABLE or G_PARAM_READWRITE
+ *
+ * \return GParamSpec object
  */
-GType
-matahari_dict_type(int prop);
+GParamSpec *
+get_paramspec(const char *name, const char *desc, char *type, GParamFlags flags);
 
 /**
- * Dictionary type. Key is always string, value is set in constructor dict_new.
+ * Implement this class in DBus agent, call g_object_class_install_property
+ * there for each property
  */
-typedef struct
-{
-    GValue *value;
-    GValue *key;
-    DBusGTypeSpecializedAppendContext appendctx;
-} Dict;
+void
+gmatahari_init_properties(GObjectClass *gobject_class);
+
 
 /**
- * Constructor of dictionary type. Key is string, type of value is defined
- * by type of 'value'.
- * New value will be stored in 'value'. Use dict_free after setting all values.
+ * Add GList to DBusMessageIter
  */
-Dict *dict_new(GValue *value);
-
-/**
- * Add 'value' to the dictionary 'dict'.
- */
-void dict_add(Dict *dict, const gchar *key, GValue *value);
-
-/**
- * Frees memory allocated by dict_new.
- */
-void dict_free(Dict *dict);
+void
+glist_to_dbus_message_iter(GList *list, DBusMessageIter *iter);
 
 #endif

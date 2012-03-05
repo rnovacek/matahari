@@ -118,6 +118,7 @@ public:
 
 protected:
     qmf::AgentSession& getSession(void);
+    int interval;
 
 private:
     // Disallow default copy constructor/assignment
@@ -126,5 +127,17 @@ private:
 
     MatahariAgentImpl *_impl;
 };
+
+qpid::types::Variant::List
+gListToQpidList(GList *list);
+
+qpid::types::Variant::Map
+gHashTableToQpidMap(GHashTable *table);
+
+GHashTable *
+qpidMapToGHashTable(const qpid::types::Variant::Map &map);
+
+GList *
+qpidListToGList(const qpid::types::Variant::List &list);
 
 #endif // __MATAHARI_DAEMON_H
