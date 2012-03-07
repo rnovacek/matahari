@@ -77,7 +77,10 @@ include(FindPkgConfig)
 pkg_check_modules(systemd systemd)
 
 if(systemd_FOUND)
-    set(systemdunitdir "/lib/systemd/system")
+    # Get systemd unit directory
+    execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} --variable systemdsystemunitdir systemd
+                    OUTPUT_VARIABLE systemdunitdir
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
 
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/matahari-vios-proxy-host.service.in
                    ${CMAKE_CURRENT_BINARY_DIR}/matahari-vios-proxy-host.service)

@@ -69,7 +69,10 @@ check_function_exists (time HAVE_TIME)
 # systemd
 pkg_check_modules(systemd systemd)
 if(systemd_FOUND)
-    set(systemdunitdir "/lib/systemd/system")
+    # get systemd unit directory
+    execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} --variable systemdsystemunitdir systemd
+                    OUTPUT_VARIABLE systemdunitdir
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif(systemd_FOUND)
 
 # pcre
