@@ -180,6 +180,14 @@ def getRandomKey(length):
     return ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(length))
 
 
+def find_binary(name):
+    """ Try use system-wide binaries first, then try local build. """
+    path = '/usr/sbin/%s' % name
+    if not os.path.isfile(path):
+        dirname = name.split('-', 2)[2][:-1]
+        path = "../../linux.build/src/%s/%s" % (dirname, name)
+    return path
+
 class MatahariAgent(object):
     def __init__(self, agent_name):
         self.agent_name = agent_name
@@ -213,8 +221,9 @@ class MatahariBroker(MatahariAgent):
 
 class MatahariQMFAgent(MatahariAgent):
     def start(self):
-        sys.stderr.write("Starting %s ...\n" % self.agent_name)
-        self.agent = subprocess.Popen([self.agent_name, "--reconnect", "yes",
+        path = find_binary(self.agent_name)
+        sys.stderr.write("Starting %s ...\n" % path)
+        self.agent = subprocess.Popen([os.path.abspath(path), "--reconnect", "yes",
                                        "--broker", "127.0.0.1", "--port", "49001", "-v"],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
@@ -223,7 +232,8 @@ class MatahariDBusAgent(MatahariAgent):
     def start(self):
         if self.agent_name is None:
             return
-        sys.stderr.write("Starting %s ...\n" % self.agent_name)
-        self.agent = subprocess.Popen(["%s" % self.agent_name, "-vvv"],
+        path = find_binary(self.agent_name)
+        sys.stderr.write("Starting %s ...\n" % path)
+        self.agent = subprocess.Popen([os.path.abspath(path), "-vvv"],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
