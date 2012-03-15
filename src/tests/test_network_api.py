@@ -21,6 +21,7 @@
 """
 
 import commands as cmd
+from qmf2 import QmfAgentException
 import matahariTest as testUtil
 import unittest
 import time
@@ -236,11 +237,11 @@ class TestNetworkApi(unittest.TestCase):
             self.assertTrue(output == ip_value, "DBus: IP (%s) is not equal to ifconfig (%s)" % (str(output), str(ip_value)))
 
     def test_get_ip_addr_bad_value(self):
-        results = qmf.get_ip_address("bad")
-        self.assertTrue(results.get('ip') == '', "QMF: Bad IP for invalid interface, expecting empty string")
+        self.assertRaises(QmfAgentException, qmf.get_ip_address, "bad")
 
         if testUtil.haveDBus:
-            self.assertTrue(dbus.get_ip_address("bad") == '', "DBus: Bad IP for invalid interface, expecting empty string")
+            from dbus import DBusException
+            self.assertRaises(DBusException, dbus.get_ip_address, "bad")
 
     # TEST - get_mac_address()
     # ================================================================
@@ -248,6 +249,9 @@ class TestNetworkApi(unittest.TestCase):
         result = qmf.get_mac_address(self.nic_ut)
         mac_value = result.get("mac")
         output = cmd.getoutput("ifconfig "+self.nic_ut+" | grep 'HWaddr' | sed 's/^.*HWaddr \(.*\)\{1\}.*$/\\1/'").strip()
+        if len(output) == 0:
+            # Fedora >= 17 has different output of ifconfig
+            output = cmd.getoutput("ifconfig "+self.nic_ut+" | grep 'ether' | sed 's/^.*ether \([^ ]*\).*$/\\1/'").strip().upper()
         self.assertTrue(output == mac_value, "QMF: MAC (%s) is not equal to ifconfig (%s)" % (str(output), str(mac_value)))
 
         if testUtil.haveDBus:
@@ -256,8 +260,8 @@ class TestNetworkApi(unittest.TestCase):
 
 
     def test_get_mac_addr_bad_value(self):
-        results = qmf.get_mac_address("bad")
-        self.assertTrue(results.get('mac') == '', "QMF: Bad MAC for invalid interface, expecting empty string")
+        self.assertRaises(QmfAgentException, qmf.get_mac_address, "bad")
 
         if testUtil.haveDBus:
-            self.assertTrue(dbus.get_mac_address('mac') == '', "DBus: Bad MAC for invalid interface, expecting empty string")
+            from dbus import DBusException
+            self.assertRaises(DBusException, dbus.get_mac_address, "mac")

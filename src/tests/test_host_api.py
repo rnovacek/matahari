@@ -45,7 +45,7 @@ def tearDownModule():
 
 class HostTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-hostd", "host", "Host",
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-hostd", "Host", "Host",
                                      "matahari-dbus-hostd", ("org.matahariproject.Host",
                                                              "/org/matahariproject/Host",
                                                              "org.matahariproject.Host"))
@@ -321,12 +321,18 @@ class HostApiTests(unittest.TestCase):
             self.assertEqual(uuid, test_uuid, "DBus uuid value ("+uuid+") not matching expected("+test_uuid+")")
 
     def test_set_uuid_Hardware_lifetime_fails(self):
-        result = qmf.set_uuid('Hardware', testUtil.getRandomKey(20) )
-        self.assertEqual(result.get('rc'), 23, "Unexpected return code ("+str(result.get('rc'))+"), expected 23")
+        self.assertRaises(QmfAgentException, qmf.set_uuid, 'Hardware', testUtil.getRandomKey(20))
+
+        if testUtil.haveDBus:
+            from dbus import DBusException
+            self.assertRaises(DBusException, dbus.set_uuid, 'Hardware', testUtil.getRandomKey(20))
 
     def test_set_uuid_Reboot_lifetime_fails(self):
-        result = qmf.set_uuid('Reboot', testUtil.getRandomKey(20) )
-        self.assertEqual(result.get('rc'), 23, "Unexpected return code ("+str(result.get('rc'))+"), expected 23")
+        self.assertRaises(QmfAgentException, qmf.set_uuid, 'Reboot', testUtil.getRandomKey(20))
+
+        if testUtil.haveDBus:
+            from dbus import DBusException
+            self.assertRaises(DBusException, dbus.set_uuid, 'Reboot', testUtil.getRandomKey(20))
 
     # TEST - misc
     # =====================================================

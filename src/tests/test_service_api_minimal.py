@@ -43,7 +43,7 @@ def tearDownModule():
 
 class ServicesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Services",
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "Service", "Services",
                                      "matahari-dbus-serviced", ("org.matahariproject.Services",
                                                                 "/org/matahariproject/Services",
                                                                 "org.matahariproject.Services"))

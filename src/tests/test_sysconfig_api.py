@@ -126,8 +126,6 @@ class HTTPThread(threading.Thread):
 # =====================================================
 def setUpModule():
     global httpd_thread, connection, qmf, dbus
-    httpd_thread = HTTPThread()
-    httpd_thread.start()
 
     # get puppet pre-req
     if platform.dist()[0] == 'redhat':
@@ -137,6 +135,10 @@ def setUpModule():
             sys.exit("Unable to install puppet (required for sysconfig tests)")
 
     connection = SysconfigTestsSetup()
+
+    httpd_thread = HTTPThread()
+    httpd_thread.start()
+
     qmf = connection.qmf
     dbus = connection.dbus
 
@@ -150,9 +152,9 @@ def tearDownModule():
 class SysconfigTestsSetup(testUtil.TestsSetup):
     def __init__(self):
         testUtil.TestsSetup.__init__(self, "matahari-qmf-sysconfigd", "Sysconfig", "Sysconfig",
-                                           "matahari-dbus-sysconfigd", ("org.matahariproject.Sysconfig",
-                                                                        "/org/matahariproject/Sysconfig",
-                                                                        "org.matahariproject.Sysconfig"))
+                                     "matahari-dbus-sysconfigd", ("org.matahariproject.Sysconfig",
+                                                                  "/org/matahariproject/Sysconfig",
+                                                                  "org.matahariproject.Sysconfig"))
 
 class TestSysconfigApi(unittest.TestCase):
 

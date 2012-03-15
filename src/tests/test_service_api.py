@@ -31,9 +31,9 @@ import stat
 
 qmf = None
 dbus = None
-test_svc = 'snmpd'
-# TODO: snmpd uses systemd on Fedora >= 16, replace it with other service, like qpidd
-#test_svc = 'qpidd'
+#test_svc = 'snmpd'
+# TODO: snmpd uses systemd on Fedora >= 16, replace it with other service, like tuned
+test_svc = 'tuned'
 
 # Initialization
 # =====================================================
@@ -67,7 +67,7 @@ def list_executable_files(directory):
 
 class ServicesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Services",
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "Service", "Services",
                                      "matahari-dbus-serviced", ("org.matahariproject.Services",
                                                                 "/org/matahariproject/Services",
                                                                 "org.matahariproject.Services"))

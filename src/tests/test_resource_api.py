@@ -45,7 +45,7 @@ def tearDownModule():
 
 class ResourcesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Resources")
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "Service", "Resources")
 
 class TestResourceApi(unittest.TestCase):
 
